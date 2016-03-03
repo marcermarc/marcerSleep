@@ -1,0 +1,11 @@
+name: marcerSleep
+version: 0.2.0-Beta
+author: marcermarc
+main: de.marcermarc.sleep.Main
+commands:
+  marcerSleep:
+    description: Zum Einstellen des Plugins
+    usage: /marcerSleep
+  mS:
+    description: Zum Einstellen des Plugins
+    usage: /mS

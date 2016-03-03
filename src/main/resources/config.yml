@@ -1,0 +1,4 @@
+percentOfPlayerMustSleep: 0.5
+messageAfterSleep: 'Good Morning!'
+messageSomeoneGoSleep: '@player goes to sleep now! (@sleepingPlayer/@mustSleepPlayer)'
+messageSomeoneGetUp: '@player get up! (@sleepingPlayer/@mustSleepPlayer)'
