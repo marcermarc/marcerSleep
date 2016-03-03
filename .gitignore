@@ -21,6 +21,8 @@ hs_err_pid*
 .idea/modules.xml
 .idea/vcs.xml
 .idea/jsLibraryMappings.xml
+.idea/compiler.xml
+.idea/misc.xml
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
