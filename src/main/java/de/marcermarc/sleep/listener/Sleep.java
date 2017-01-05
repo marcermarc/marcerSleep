@@ -2,6 +2,7 @@ package de.marcermarc.sleep.listener;
 
 import de.marcermarc.sleep.controller.PluginController;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -11,6 +12,7 @@ import org.bukkit.event.player.PlayerBedLeaveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -19,91 +21,115 @@ public class Sleep implements Listener {
 
     private PluginController controller;
 
-    private HashSet<Player> sleepingPlayer;
-
     private Timer timer;
 
-    private boolean timerRun = false;
+    private HashMap<World, Integer> sleepingPlayerPerWorld;
+    private HashSet<Player> sleepingPlayer;
+
+    private HashMap<World, TimerTask> timerTasks;
+
+    private HashMap<World, Boolean> timerRun;
 
     public Sleep(PluginController controller) {
         this.controller = controller;
         this.sleepingPlayer = new HashSet<>();
-    }
+        this.sleepingPlayerPerWorld = new HashMap<>();
+        this.timer = new Timer();
+        this.timerTasks = new HashMap<>();
+        this.timerRun = new HashMap<>();
 
-//    @EventHandler(priority = EventPriority.LOW)
-//    public void onPlayerJoin(PlayerJoinEvent event) {
-//
-//    }
+        for (World w : Bukkit.getWorlds()) {
+            this.sleepingPlayerPerWorld.put(w, 0);
+            this.timerRun.put(w, false);
+        }
+    }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerLeave(PlayerQuitEvent event) {
-        sleepingPlayer.remove(event.getPlayer());
-        testSleep();
+        if (sleepingPlayer.remove(event.getPlayer())) {
+            int anzahl = this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld());
+            if (anzahl > 0) {
+                this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), anzahl - 1);
+            }
+        }
+        testSleep(event.getPlayer().getWorld());
     }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onEnterBed(PlayerBedEnterEvent event) {
-        sleepingPlayer.add(event.getPlayer());
-        sendSleepMessage(controller.getConfig().getMessageSomeoneGoSleep(), event.getPlayer());
-        testSleep();
+        this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld()) + 1);
+        this.sleepingPlayer.add(event.getPlayer());
+        sendSleepMessage(controller.getConfig().getMessageSomeoneGoSleep(), event.getPlayer(), event.getPlayer().getWorld());
+        testSleep(event.getPlayer().getWorld());
     }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onLeaveBed(PlayerBedLeaveEvent event) {
-        sleepingPlayer.remove(event.getPlayer());
-        sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), event.getPlayer());
+        int anzahl = this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld());
+        this.sleepingPlayer.remove(event.getPlayer());
+
+        if (anzahl > 0) {
+            this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), anzahl - 1);
+            sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), event.getPlayer(), event.getPlayer().getWorld());
+        }
     }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onChangeWorld(PlayerChangedWorldEvent event) {
-        testSleep();
+        testSleep(event.getFrom());
     }
 
-    private void testSleep() {
-        if (controller.getConfig().getPercentOfPlayerMustSleep() * Bukkit.getWorlds().get(0).getPlayers().size() <= sleepingPlayer.size()) {
-            if (!timerRun) {
+    private void testSleep(World world) {
+        if (controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size() <= sleepingPlayer.size()) {
+            if (!timerRun.get(world)) {
                 TimerTask tt = new TimerTask() {
                     @Override
                     public void run() {
-                        sleep();
+                        sleep(world);
                     }
                 };
-                timer = new Timer();
-                timer.schedule(tt, 5000L);
-                timerRun = true;
+                this.timer.schedule(tt, 5000L);
+                this.timerTasks.put(world, tt);
+                this.timerRun.put(world, true);
             }
         } else {
-            if (timerRun) {
-                timer.cancel();
-                timerRun = false;
+            if (this.timerRun.get(world)) {
+                TimerTask tt = this.timerTasks.remove(world);
+                tt.cancel();
+                this.timerRun.put(world, false);
             }
         }
     }
 
-    private void sleep() {
+    private void sleep(World world) {
         synchronized (Bukkit.class) {
-            Bukkit.getWorlds().get(0).setTime(0);
-            sendSleepMessage(controller.getConfig().getMessageAfterSleep(), null);
+            world.setTime(0);
+            sendSleepMessage(controller.getConfig().getMessageAfterSleep(), null, world);
 
-            if (Bukkit.getWorlds().get(0).hasStorm()) {
-                Bukkit.getWorlds().get(0).setStorm(false);
+            this.sleepingPlayerPerWorld.put(world, 0);
+
+            if (world.hasStorm()) {
+                world.setStorm(false);
             }
 
-            if (Bukkit.getWorlds().get(0).isThundering()) {
-                Bukkit.getWorlds().get(0).setThundering(false);
+            if (world.isThundering()) {
+                world.setThundering(false);
             }
+
+            this.timerRun.put(world, false);
         }
     }
 
-    private void sendSleepMessage(String message, Player player) {
-        if (player != null) {
-            message = message.replaceAll("@player", player.getDisplayName());
-        }
-        message = message.replaceAll("@sleepingPlayer", "" + sleepingPlayer.size());
-        message = message.replaceAll("@mustSleepPlayer", "" + (int) Math.ceil((controller.getConfig().getPercentOfPlayerMustSleep() * Bukkit.getWorlds().get(0).getPlayers().size())));
-        for (Player p : Bukkit.getWorlds().get(0).getPlayers()) {
-            p.sendMessage(message);
+    private void sendSleepMessage(String message, Player player, World world) {
+        if (world.getPlayers().size() != 1) {
+            if (player != null) {
+                message = message.replaceAll("@player", player.getDisplayName());
+            }
+            message = message.replaceAll("@sleepingPlayer", "" + sleepingPlayer.size());
+            message = message.replaceAll("@mustSleepPlayer", "" + (int) Math.ceil((controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size())));
+            for (Player p : world.getPlayers()) {
+                p.sendMessage(message);
+            }
         }
     }
-
 }
