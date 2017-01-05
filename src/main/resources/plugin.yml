@@ -1,5 +1,5 @@
 name: marcerSleep
-version: 0.3.1-BETA
+version: 0.4.0-BETA
 author: marcermarc
 main: de.marcermarc.sleep.Main
 commands:

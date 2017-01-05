@@ -11,6 +11,7 @@ import org.bukkit.event.player.PlayerBedEnterEvent;
 import org.bukkit.event.player.PlayerBedLeaveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,12 +22,10 @@ public class Sleep implements Listener {
 
     private PluginController controller;
 
-    private Timer timer;
-
     private HashMap<World, Integer> sleepingPlayerPerWorld;
     private HashSet<Player> sleepingPlayer;
 
-    private HashMap<World, TimerTask> timerTasks;
+    private HashMap<World, BukkitTask> tasks;
 
     private HashMap<World, Boolean> timerRun;
 
@@ -34,8 +33,7 @@ public class Sleep implements Listener {
         this.controller = controller;
         this.sleepingPlayer = new HashSet<>();
         this.sleepingPlayerPerWorld = new HashMap<>();
-        this.timer = new Timer();
-        this.timerTasks = new HashMap<>();
+        this.tasks = new HashMap<>();
         this.timerRun = new HashMap<>();
 
         for (World w : Bukkit.getWorlds()) {
@@ -82,22 +80,24 @@ public class Sleep implements Listener {
     private void testSleep(World world) {
         if (controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size() <= sleepingPlayer.size()) {
             if (!timerRun.get(world)) {
-                TimerTask tt = new TimerTask() {
+                Runnable r = new Runnable() {
                     @Override
                     public void run() {
                         sleep(world);
                     }
                 };
-                this.timer.schedule(tt, 5000L);
-                this.timerTasks.put(world, tt);
+                this.tasks.put(world, Bukkit.getScheduler().runTaskLater(controller.getMain(), r, 100L));
                 this.timerRun.put(world, true);
             }
         } else {
-            if (this.timerRun.get(world)) {
-                TimerTask tt = this.timerTasks.remove(world);
-                tt.cancel();
-                this.timerRun.put(world, false);
-            }
+            cancelTimer(world);
+        }
+    }
+
+    private void cancelTimer(World world) {
+        if (this.timerRun.get(world)) {
+            this.tasks.remove(world).cancel();
+            this.timerRun.put(world, false);
         }
     }
 
