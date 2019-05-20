@@ -15,8 +15,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class Sleep implements Listener {
 
@@ -55,10 +53,12 @@ public class Sleep implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onEnterBed(PlayerBedEnterEvent event) {
-        this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld()) + 1);
-        this.sleepingPlayer.add(event.getPlayer());
-        sendSleepMessage(controller.getConfig().getMessageSomeoneGoSleep(), event.getPlayer(), event.getPlayer().getWorld());
-        testSleep(event.getPlayer().getWorld());
+        if (event.getBedEnterResult() == PlayerBedEnterEvent.BedEnterResult.OK) {
+            this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld()) + 1);
+            this.sleepingPlayer.add(event.getPlayer());
+            sendSleepMessage(controller.getConfig().getMessageSomeoneGoSleep(), event.getPlayer(), event.getPlayer().getWorld());
+            testSleep(event.getPlayer().getWorld());
+        }
     }
 
     @EventHandler(priority = EventPriority.LOW)
@@ -80,12 +80,7 @@ public class Sleep implements Listener {
     private void testSleep(World world) {
         if (controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size() <= sleepingPlayer.size()) {
             if (!timerRun.get(world)) {
-                Runnable r = new Runnable() {
-                    @Override
-                    public void run() {
-                        sleep(world);
-                    }
-                };
+                Runnable r = () -> sleep(world);
                 this.tasks.put(world, Bukkit.getScheduler().runTaskLater(controller.getMain(), r, 100L));
                 this.timerRun.put(world, true);
             }

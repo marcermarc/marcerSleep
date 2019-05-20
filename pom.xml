@@ -6,7 +6,7 @@
 
     <groupId>de.marcermarc.sleep</groupId>
     <artifactId>marcerSleep</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 
     <!-- Publishing Strategy from https://stackoverflow.com/questions/14013644/hosting-a-maven-repository-on-github -->
 
@@ -84,7 +84,7 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.13.1-R0.1-SNAPSHOT</version>
+            <version>1.14.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
