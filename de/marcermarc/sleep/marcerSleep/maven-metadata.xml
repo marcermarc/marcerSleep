@@ -3,10 +3,11 @@
   <groupId>de.marcermarc.sleep</groupId>
   <artifactId>marcerSleep</artifactId>
   <versioning>
-    <release>1.0.0</release>
+    <release>1.1.0</release>
     <versions>
       <version>1.0.0</version>
+      <version>1.1.0</version>
     </versions>
-    <lastUpdated>20181105205314</lastUpdated>
+    <lastUpdated>20190520180422</lastUpdated>
   </versioning>
 </metadata>
