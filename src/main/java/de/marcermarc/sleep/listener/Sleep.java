@@ -11,6 +11,7 @@ import org.bukkit.event.player.PlayerBedEnterEvent;
 import org.bukkit.event.player.PlayerBedLeaveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
@@ -18,32 +19,39 @@ import java.util.HashSet;
 
 public class Sleep implements Listener {
 
-    private PluginController controller;
+    private final PluginController controller;
 
-    private HashMap<World, Integer> sleepingPlayerPerWorld;
-    private HashSet<Player> sleepingPlayer;
+    private final HashMap<World, Integer> sleepingPlayerPerWorld;
+    private final HashSet<Player> sleepingPlayer;
 
-    private HashMap<World, BukkitTask> tasks;
+    private final HashMap<World, BukkitTask> tasks;
 
-    private HashMap<World, Boolean> timerRun;
+    private final HashSet<World> timerRun;
 
     public Sleep(PluginController controller) {
         this.controller = controller;
         this.sleepingPlayer = new HashSet<>();
         this.sleepingPlayerPerWorld = new HashMap<>();
         this.tasks = new HashMap<>();
-        this.timerRun = new HashMap<>();
+        this.timerRun = new HashSet<>();
+    }
 
-        for (World w : Bukkit.getWorlds()) {
-            this.sleepingPlayerPerWorld.put(w, 0);
-            this.timerRun.put(w, false);
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onWorldUnload(WorldUnloadEvent event) {
+        sleepingPlayerPerWorld.remove(event.getWorld());
+
+        if (tasks.containsKey(event.getWorld())) {
+            tasks.get(event.getWorld()).cancel();
+            tasks.remove(event.getWorld());
         }
+
+        timerRun.remove(event.getWorld());
     }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerLeave(PlayerQuitEvent event) {
         if (sleepingPlayer.remove(event.getPlayer())) {
-            int anzahl = this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld());
+            int anzahl = this.sleepingPlayerPerWorld.getOrDefault(event.getPlayer().getWorld(), 0);
             if (anzahl > 0) {
                 this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), anzahl - 1);
             }
@@ -54,7 +62,7 @@ public class Sleep implements Listener {
     @EventHandler(priority = EventPriority.LOW)
     public void onEnterBed(PlayerBedEnterEvent event) {
         if (event.getBedEnterResult() == PlayerBedEnterEvent.BedEnterResult.OK) {
-            this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld()) + 1);
+            this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), this.sleepingPlayerPerWorld.getOrDefault(event.getPlayer().getWorld(), 0) + 1);
             this.sleepingPlayer.add(event.getPlayer());
             sendSleepMessage(controller.getConfig().getMessageSomeoneGoSleep(), event.getPlayer(), event.getPlayer().getWorld());
             testSleep(event.getPlayer().getWorld());
@@ -63,7 +71,7 @@ public class Sleep implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onLeaveBed(PlayerBedLeaveEvent event) {
-        int anzahl = this.sleepingPlayerPerWorld.get(event.getPlayer().getWorld());
+        int anzahl = this.sleepingPlayerPerWorld.getOrDefault(event.getPlayer().getWorld(), 0);
         this.sleepingPlayer.remove(event.getPlayer());
 
         if (anzahl > 0) {
@@ -79,10 +87,10 @@ public class Sleep implements Listener {
 
     private void testSleep(World world) {
         if (controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size() <= sleepingPlayer.size()) {
-            if (!timerRun.get(world)) {
+            if (!timerRun.contains(world)) {
                 Runnable r = () -> sleep(world);
                 this.tasks.put(world, Bukkit.getScheduler().runTaskLater(controller.getMain(), r, 100L));
-                this.timerRun.put(world, true);
+                this.timerRun.add(world);
             }
         } else {
             cancelTimer(world);
@@ -90,9 +98,9 @@ public class Sleep implements Listener {
     }
 
     private void cancelTimer(World world) {
-        if (this.timerRun.get(world)) {
+        if (this.timerRun.contains(world)) {
             this.tasks.remove(world).cancel();
-            this.timerRun.put(world, false);
+            this.timerRun.remove(world);
         }
     }
 
@@ -111,7 +119,7 @@ public class Sleep implements Listener {
                 world.setThundering(false);
             }
 
-            this.timerRun.put(world, false);
+            this.timerRun.remove(world);
         }
     }
 
