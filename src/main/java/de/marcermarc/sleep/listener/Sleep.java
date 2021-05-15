@@ -41,8 +41,7 @@ public class Sleep implements Listener {
         sleepingPlayerPerWorld.remove(event.getWorld());
 
         if (tasks.containsKey(event.getWorld())) {
-            tasks.get(event.getWorld()).cancel();
-            tasks.remove(event.getWorld());
+            tasks.remove(event.getWorld()).cancel();
         }
 
         timerRun.remove(event.getWorld());
@@ -50,13 +49,9 @@ public class Sleep implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerLeave(PlayerQuitEvent event) {
-        if (sleepingPlayer.remove(event.getPlayer())) {
-            int anzahl = this.sleepingPlayerPerWorld.getOrDefault(event.getPlayer().getWorld(), 0);
-            if (anzahl > 0) {
-                this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), anzahl - 1);
-            }
-        }
-        testSleep(event.getPlayer().getWorld());
+        removePlayerFromWorld(event.getPlayer(), event.getPlayer().getWorld());
+
+        testSleep(event.getPlayer().getWorld(), true);
     }
 
     @EventHandler(priority = EventPriority.LOW)
@@ -71,29 +66,53 @@ public class Sleep implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onLeaveBed(PlayerBedLeaveEvent event) {
-        int anzahl = this.sleepingPlayerPerWorld.getOrDefault(event.getPlayer().getWorld(), 0);
-        this.sleepingPlayer.remove(event.getPlayer());
-
-        if (anzahl > 0) {
-            this.sleepingPlayerPerWorld.put(event.getPlayer().getWorld(), anzahl - 1);
-            sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), event.getPlayer(), event.getPlayer().getWorld());
-        }
+        removePlayerFromWorld(event.getPlayer(), event.getPlayer().getWorld());
     }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onChangeWorld(PlayerChangedWorldEvent event) {
+        removePlayerFromWorld(event.getPlayer(), event.getFrom());
+
+        // test for old and new world
         testSleep(event.getFrom());
+        testSleep(event.getPlayer().getWorld());
+    }
+
+    private void removePlayerFromWorld(Player player, World world) {
+        if (sleepingPlayer.remove(player)) {
+            sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), player, world);
+
+            int anzahl = this.sleepingPlayerPerWorld.getOrDefault(world, 0);
+            if (anzahl > 0) {
+                this.sleepingPlayerPerWorld.put(world, anzahl - 1);
+            }
+        }
     }
 
     private void testSleep(World world) {
-        if (controller.getConfig().getPercentOfPlayerMustSleep() * world.getPlayers().size() <= sleepingPlayer.size()) {
-            if (!timerRun.contains(world)) {
-                Runnable r = () -> sleep(world);
-                this.tasks.put(world, Bukkit.getScheduler().runTaskLater(controller.getMain(), r, 100L));
-                this.timerRun.add(world);
-            }
+        testSleep(world, false);
+    }
+
+    private void testSleep(World world, boolean onePlayerLeaving) {
+        double percentageOfPlayerMustSleep = controller.getConfig().getPercentOfPlayerMustSleep();
+        int sleepingPlayer = this.sleepingPlayerPerWorld.get(world);
+        int playerInWorld = world.getPlayers().size();
+        if (onePlayerLeaving) {
+            playerInWorld--;
+        }
+
+        if (percentageOfPlayerMustSleep * playerInWorld <= sleepingPlayer) {
+            startTimer(world);
         } else {
             cancelTimer(world);
+        }
+    }
+
+    private void startTimer(World world) {
+        if (!timerRun.contains(world)) {
+            Runnable r = () -> sleep(world);
+            this.tasks.put(world, Bukkit.getScheduler().runTaskLater(controller.getMain(), r, 100L));
+            this.timerRun.add(world);
         }
     }
 
@@ -105,22 +124,20 @@ public class Sleep implements Listener {
     }
 
     private void sleep(World world) {
-        synchronized (Bukkit.class) {
-            world.setTime(0);
-            sendSleepMessage(controller.getConfig().getMessageAfterSleep(), null, world);
+        world.setTime(0);
+        sendSleepMessage(controller.getConfig().getMessageAfterSleep(), null, world);
 
-            this.sleepingPlayerPerWorld.put(world, 0);
+        this.sleepingPlayerPerWorld.put(world, 0);
 
-            if (world.hasStorm()) {
-                world.setStorm(false);
-            }
-
-            if (world.isThundering()) {
-                world.setThundering(false);
-            }
-
-            this.timerRun.remove(world);
+        if (world.hasStorm()) {
+            world.setStorm(false);
         }
+
+        if (world.isThundering()) {
+            world.setThundering(false);
+        }
+
+        this.timerRun.remove(world);
     }
 
     private void sendSleepMessage(String message, Player player, World world) {
