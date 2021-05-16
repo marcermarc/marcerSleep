@@ -98,7 +98,7 @@ public class Sleep implements Listener {
 
     private void testSleep(World world, boolean onePlayerLeaving) {
         double percentageOfPlayerMustSleep = controller.getConfig().getPercentOfPlayerMustSleep();
-        int sleepingPlayer = this.sleepingPlayerPerWorld.get(world);
+        int sleepingPlayer = this.sleepingPlayerPerWorld.getOrDefault(world, 0);
         int playerInWorld = world.getPlayers().size();
         if (onePlayerLeaving) {
             playerInWorld--;
