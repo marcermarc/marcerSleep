@@ -80,7 +80,10 @@ public class Sleep implements Listener {
 
     private void removePlayerFromWorld(Player player, World world) {
         if (sleepingPlayer.remove(player)) {
-            sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), player, world);
+            if (world.getTime() > 100) {
+                // if time < 100 the time was set shortly before to 0
+                sendSleepMessage(controller.getConfig().getMessageSomeoneGetUp(), player, world);
+            }
 
             int anzahl = this.sleepingPlayerPerWorld.getOrDefault(world, 0);
             if (anzahl > 0) {
